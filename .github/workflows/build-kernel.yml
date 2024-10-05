@@ -62,7 +62,7 @@ jobs:
         run: |
           cd kernel
           echo "Generating DTB files..."
-          make O=out ${TARGET_KERNEL_CONFIG}  # Configure kernel
+          make O=out oldconfig  # Ensure the configuration is set up correctly
           make O=out dtbs ARCH=arm64 CC=clang LLVM=1  # Generate DTB files into the output directory
           if [ -n "$(ls out/arch/arm64/boot/dts/*.dtb 2>/dev/null)" ]; then
             echo "DTB files generated successfully."
