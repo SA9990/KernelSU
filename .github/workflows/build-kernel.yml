@@ -23,21 +23,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio
-          # Install libsparse-utils, which includes mkbootimg
-          sudo apt-get install -y android-sdk-libsparse-utils
 
-      # Step 3: Check for mkbootimg
-      - name: Check mkbootimg Availability
+      # Step 3: Clone mkbootimg from BlissRoms
+      - name: Clone mkbootimg
         run: |
-          if ! command -v mkbootimg &> /dev/null; then
-            echo "mkbootimg not found, downloading..."
-            wget https://github.com/LineageOS/android_build/raw/master/tools/mkbootimg -O mkbootimg
-            chmod +x mkbootimg
-            sudo mv mkbootimg /usr/local/bin/  # Move to a directory in your PATH
-          else
-            echo "mkbootimg is available."
-          fi
-      
+          git clone --depth=1 https://github.com/BlissRoms/platform_system_tools_mkbootimg.git mkbootimg
+          cd mkbootimg/universe
+          chmod +x mkbootimg
+          sudo mv mkbootimg /usr/local/bin/  # Move to a directory in your PATH
+
       # Step 4: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
         run: |
