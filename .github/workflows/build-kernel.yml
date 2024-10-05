@@ -3,27 +3,35 @@ name: Kernel Build
 on:
   push:
     branches:
-      - main     # Change this to the branch you want to trigger builds on.
+      - main      # Change this to the branch you want to trigger builds on.
   pull_request:
     branches:
-      - main     # You can also trigger on pull requests.
+      - main      # You can also trigger on pull requests.
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the kernel source
-      - name: Checkout Kernel Source
+      # Step 1: Checkout the current repository (contains kernel source or manifest)
+      - name: Checkout Repository
         uses: actions/checkout@v3
+      
+      # Step 2 (Optional): Clone Kernel Source from External Repo (if not part of the repo)
+      - name: Clone Kernel Source
+        run: |
+          if [ ! -d "arch" ]; then
+            git clone --depth=1 https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
+            cd kernel
+          fi
 
-      # Step 2: Set up Proton Clang or Custom Clang toolchain
+      # Step 3: Set up Proton Clang or Custom Clang toolchain
       - name: Download and Setup Custom Clang
         run: |
           git clone https://github.com/kdrag0n/proton-clang.git --depth=1 clang
           export PATH=$(pwd)/clang/bin:$PATH
 
-      # Step 3: Set up environment variables
+      # Step 4: Set up environment variables
       - name: Set Up Environment Variables
         run: |
           export ARCH=arm64
@@ -33,19 +41,19 @@ jobs:
           export CLANG_TRIPLE=aarch64-linux-gnu-
           export PATH=$(pwd)/clang/bin:$PATH
 
-      # Step 4: Configure the kernel (use device-specific defconfig)
+      # Step 5: Configure the kernel (use device-specific defconfig)
       - name: Configure Kernel
         run: |
-          make O=out <device_defconfig>   # Change to your device's defconfig
+          make O=out vendor/obiwan_defconfig  # Replace with your device's defconfig
           
-      # Step 5: Compile the kernel with Clang
+      # Step 6: Compile the kernel with Clang
       - name: Compile Kernel
         run: |
           make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1
 
-      # Step 6: Upload the compiled kernel artifacts (optional)
+      # Step 7: Upload the compiled kernel artifacts (optional)
       - name: Upload Compiled Kernel Image
         uses: actions/upload-artifact@v3
         with:
           name: kernel-image
-          path: out/arch/arm64/boot/Image.gz  # Or other appropriate path for kernel image
+          path: out/arch/arm64/boot/Image.gz  # Or the appropriate path for the kernel image
