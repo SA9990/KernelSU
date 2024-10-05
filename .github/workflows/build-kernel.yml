@@ -51,13 +51,20 @@ jobs:
           echo "TARGET_KERNEL_CLANG_VERSION=r416183b1" >> $GITHUB_ENV
           echo "TARGET_KERNEL_LLVM_BINUTILS=false" >> $GITHUB_ENV
 
-      # Step 6: Debug - List DTS files
+      # Step 6: Clean Kernel Source
+      - name: Clean Kernel Source
+        run: |
+          cd kernel
+          make mrproper  # Clean the kernel source directory
+          echo "Kernel source cleaned."
+
+      # Step 7: Debug - List DTS files
       - name: List DTS files
         run: |
           echo "Listing DTS files..."
           ls kernel/arch/arm64/boot/dts/
 
-      # Step 7: Generate DTB Files Before Kernel Compilation
+      # Step 8: Generate DTB Files Before Kernel Compilation
       - name: Generate DTB Files
         run: |
           cd kernel
@@ -70,13 +77,13 @@ jobs:
             echo "Failed to generate DTB files." && exit 1
           fi
 
-      # Step 8: Compile the Kernel
+      # Step 9: Compile the Kernel
       - name: Compile Kernel
         run: |
           cd kernel
           make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1  # Compile kernel
 
-      # Step 9: Create AnyKernel3 Zip
+      # Step 10: Create AnyKernel3 Zip
       - name: Create AnyKernel3 Zip
         run: |
           mkdir -p AnyKernel3/ramdisk
@@ -89,14 +96,14 @@ jobs:
           rm -rf ramdisk  # Clean up the temporary ramdisk directory
           zip -r AnyKernel3.zip * -x ".git*"  # Create the AnyKernel3 zip
 
-      # Step 10: Upload the AnyKernel3 zip
+      # Step 11: Upload the AnyKernel3 zip
       - name: Upload AnyKernel3 Zip
         uses: actions/upload-artifact@v3
         with:
           name: anykernel3-zip
           path: AnyKernel3/AnyKernel3.zip
 
-      # Step 11: Clean up cloned repositories
+      # Step 12: Clean up cloned repositories
       - name: Clean Up
         run: |
           rm -rf kernel clang AnyKernel3
