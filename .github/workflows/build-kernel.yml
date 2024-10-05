@@ -3,10 +3,10 @@ name: Kernel Build
 on:
   push:
     branches:
-      - main      # Adjust this to your desired branch.
+      - main  # Adjust this to your desired branch.
   pull_request:
     branches:
-      - main      # Trigger on pull requests to the main branch.
+      - main  # Trigger on pull requests to the main branch.
   workflow_dispatch:  # Allow manual triggering of the workflow.
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
-      # Step 2: Install required packages including cross-compiler and mkbootimg
+      # Step 2: Install required packages including cross-compiler
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -26,18 +26,30 @@ jobs:
           # Install libsparse-utils, which includes mkbootimg
           sudo apt-get install -y android-sdk-libsparse-utils
 
-      # Step 3: Clone Kernel Source from Bliss ROMs repository
+      # Step 3: Check for mkbootimg
+      - name: Check mkbootimg Availability
+        run: |
+          if ! command -v mkbootimg &> /dev/null; then
+            echo "mkbootimg not found, downloading..."
+            wget https://github.com/LineageOS/android_build/raw/master/tools/mkbootimg -O mkbootimg
+            chmod +x mkbootimg
+            sudo mv mkbootimg /usr/local/bin/  # Move to a directory in your PATH
+          else
+            echo "mkbootimg is available."
+          fi
+      
+      # Step 4: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
 
-      # Step 4: Download and Setup Custom Clang toolchain
+      # Step 5: Download and Setup Custom Clang toolchain
       - name: Download and Setup Custom Clang
         run: |
           git clone https://github.com/kdrag0n/proton-clang.git --depth=1 clang
           export PATH=$(pwd)/clang/bin:$PATH
 
-      # Step 5: Set up environment variables
+      # Step 6: Set up environment variables
       - name: Set Up Environment Variables
         run: |
           echo "ARCH=arm64" >> $GITHUB_ENV
@@ -55,30 +67,30 @@ jobs:
           echo "TARGET_KERNEL_LLVM_BINUTILS=false" >> $GITHUB_ENV
           echo "PATH=$(pwd)/clang/bin:$PATH" >> $GITHUB_ENV
 
-      # Step 6: Configure the kernel
+      # Step 7: Configure the kernel
       - name: Configure Kernel
         run: |
           cd kernel  # Change to the kernel directory
           make O=out ${TARGET_KERNEL_CONFIG}   # Use the specified defconfig for your device
           
-      # Step 7: Compile the kernel with Clang
+      # Step 8: Compile the kernel with Clang
       - name: Compile Kernel
         run: |
           cd kernel  # Ensure you are in the kernel directory
           make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1
 
-      # Step 8: Check output directory for compiled files
+      # Step 9: Check output directory for compiled files
       - name: List Output Directory
         run: |
           ls -R kernel/out
 
-      # Step 9: Verify DTB files
+      # Step 10: Verify DTB files
       - name: Check for DTB Files
         run: |
           echo "Checking for DTB files:"
           ls kernel/out/arch/arm64/boot/dts/*.dtb || echo "No DTB files found"
 
-      # Step 10: Create ramdisk for boot.img
+      # Step 11: Create ramdisk for boot.img
       - name: Create Ramdisk
         run: |
           cd kernel
@@ -90,13 +102,13 @@ jobs:
           find . | cpio -H newc -o > ../ramdisk.cpio
           cd ..
 
-      # Step 11: Compile boot.img
+      # Step 12: Compile boot.img
       - name: Compile boot.img
         run: |
           cd kernel
           mkbootimg --kernel out/arch/arm64/boot/Image.gz --ramdisk ramdisk.cpio --dtb out/arch/arm64/boot/dts/*.dtb --output boot.img --base ${BOARD_KERNEL_BASE} --cmdline "${BOARD_KERNEL_CMDLINE}"
 
-      # Step 12: Upload the compiled boot.img
+      # Step 13: Upload the compiled boot.img
       - name: Upload Compiled boot.img
         uses: actions/upload-artifact@v3
         with:
