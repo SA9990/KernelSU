@@ -51,14 +51,20 @@ jobs:
           cd kernel
           make O=out ${TARGET_KERNEL_CONFIG} && make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1  # Configure and Compile kernel
 
-      # Step 6: Verify DTB Files
-      - name: Check for DTB Files
+      # Step 6: Generate DTB Files if Missing
+      - name: Generate DTB Files
         run: |
           echo "Checking for DTB files..."
-          if ls kernel/out/arch/arm64/boot/dts/*.dtb 1> /dev/null 2>&1; then
-            echo "DTB files found."
+          if [ ! -d "out/arch/arm64/boot/dts" ] || [ -z "$(ls out/arch/arm64/boot/dts/*.dtb 2>/dev/null)" ]; then
+            echo "No DTB files found. Generating DTB files..."
+            make O=out dtbs ARCH=arm64 CC=clang LLVM=1  # Generate DTB files
+            if [ -n "$(ls out/arch/arm64/boot/dts/*.dtb 2>/dev/null)" ]; then
+              echo "DTB files generated successfully."
+            else
+              echo "Failed to generate DTB files." && exit 1
+            fi
           else
-            echo "No DTB files found." && exit 1
+            echo "DTB files found."
           fi
 
       # Step 7: Create AnyKernel3 Zip
@@ -80,3 +86,8 @@ jobs:
         with:
           name: anykernel3-zip
           path: AnyKernel3/AnyKernel3.zip
+
+      # Step 9: Clean up cloned repositories
+      - name: Clean Up
+        run: |
+          rm -rf kernel clang AnyKernel3
