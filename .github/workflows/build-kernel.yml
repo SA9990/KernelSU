@@ -23,8 +23,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio
-          # Install additional tools for building boot image
-          sudo apt-get install -y android-tools-fsutils  # This includes mkbootimg
+          # Install libsparse-utils, which includes mkbootimg
+          sudo apt-get install -y android-sdk-libsparse-utils
 
       # Step 3: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
