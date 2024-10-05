@@ -45,27 +45,24 @@ jobs:
           echo "TARGET_KERNEL_CLANG_VERSION=r416183b1" >> $GITHUB_ENV
           echo "TARGET_KERNEL_LLVM_BINUTILS=false" >> $GITHUB_ENV
 
-      # Step 5: Configure and Compile the Kernel
-      - name: Configure and Compile Kernel
-        run: |
-          cd kernel
-          make O=out ${TARGET_KERNEL_CONFIG} && make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1  # Configure and Compile kernel
-
-      # Step 6: Generate DTB Files if Missing
+      # Step 5: Generate DTB Files Before Kernel Compilation
       - name: Generate DTB Files
         run: |
-          echo "Checking for DTB files..."
-          if [ ! -d "out/arch/arm64/boot/dts" ] || [ -z "$(ls out/arch/arm64/boot/dts/*.dtb 2>/dev/null)" ]; then
-            echo "No DTB files found. Generating DTB files..."
-            make O=out dtbs ARCH=arm64 CC=clang LLVM=1  # Generate DTB files
-            if [ -n "$(ls out/arch/arm64/boot/dts/*.dtb 2>/dev/null)" ]; then
-              echo "DTB files generated successfully."
-            else
-              echo "Failed to generate DTB files." && exit 1
-            fi
+          cd kernel
+          echo "Generating DTB files..."
+          make O=out ${TARGET_KERNEL_CONFIG}  # Configure kernel
+          make O=out dtbs ARCH=arm64 CC=clang LLVM=1  # Generate DTB files into the output directory
+          if [ -n "$(ls out/arch/arm64/boot/dts/*.dtb 2>/dev/null)" ]; then
+            echo "DTB files generated successfully."
           else
-            echo "DTB files found."
+            echo "Failed to generate DTB files." && exit 1
           fi
+
+      # Step 6: Compile the Kernel
+      - name: Compile Kernel
+        run: |
+          cd kernel
+          make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1  # Compile kernel
 
       # Step 7: Create AnyKernel3 Zip
       - name: Create AnyKernel3 Zip
@@ -75,7 +72,7 @@ jobs:
           git clone https://github.com/AnyKernel/AnyKernel3.git .
           # Copy the compiled kernel image and DTB files into the ramdisk
           cp ../kernel/out/arch/arm64/boot/Image ramdisk/  # Include the compiled kernel image
-          cp ../kernel/out/arch/arm64/boot/dts/*.dtb ramdisk/  # Include all DTB files
+          cp ../kernel/out/arch/arm64/boot/dts/*.dtb ramdisk/  # Include all DTB files from the output directory
           cp -r ramdisk/* .  # Move contents of ramdisk to AnyKernel root
           rm -rf ramdisk  # Clean up the temporary ramdisk directory
           zip -r AnyKernel3.zip * -x ".git*"  # Create the AnyKernel3 zip
