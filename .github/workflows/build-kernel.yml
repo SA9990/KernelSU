@@ -18,11 +18,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
-      # Step 2: Install required packages
+      # Step 2: Install required packages including cross-compiler
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git wget curl unzip python3 zip
+          sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
       # Step 3: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
