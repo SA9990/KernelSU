@@ -22,13 +22,12 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio
 
       # Step 3: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
-          cd kernel
 
       # Step 4: Download and Setup Custom Clang toolchain
       - name: Download and Setup Custom Clang
@@ -44,13 +43,21 @@ jobs:
           echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
           echo "CROSS_COMPILE_ARM32=arm-linux-gnueabi-" >> $GITHUB_ENV
           echo "CLANG_TRIPLE=aarch64-linux-gnu-" >> $GITHUB_ENV
+          echo "BOARD_KERNEL_BASE=0x00000000" >> $GITHUB_ENV
+          echo "BOARD_KERNEL_CMDLINE='androidboot.console=ttyMSM0 androidboot.hardware=qcom androidboot.memcg=1 androidboot.usbcontroller=a800000.dwc3 cgroup.memory=nokmem,nosocket console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa90000 loop.max_part=7 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 reboot=panic_warm service_locator.enable=1 swiotlb=2048'" >> $GITHUB_ENV
+          echo "BOARD_KERNEL_PAGESIZE=4096" >> $GITHUB_ENV
+          echo "BOARD_KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
+          echo "TARGET_KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV  # Use vendor/obiwan_defconfig
+          echo "TARGET_KERNEL_SOURCE=kernel/asus/sm8250" >> $GITHUB_ENV
+          echo "TARGET_KERNEL_CLANG_VERSION=r416183b1" >> $GITHUB_ENV
+          echo "TARGET_KERNEL_LLVM_BINUTILS=false" >> $GITHUB_ENV
           echo "PATH=$(pwd)/clang/bin:$PATH" >> $GITHUB_ENV
 
-      # Step 6: Configure the kernel (use device-specific defconfig)
+      # Step 6: Configure the kernel
       - name: Configure Kernel
         run: |
           cd kernel  # Change to the kernel directory
-          make O=out vendor/obiwan_defconfig   # Use the correct defconfig for your device
+          make O=out ${TARGET_KERNEL_CONFIG}   # Use the specified defconfig for your device
           
       # Step 7: Compile the kernel with Clang
       - name: Compile Kernel
@@ -58,9 +65,38 @@ jobs:
           cd kernel  # Ensure you are in the kernel directory
           make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1
 
-      # Step 8: Upload the compiled kernel artifacts (optional)
-      - name: Upload Compiled Kernel Image
+      # Step 8: Check output directory for compiled files
+      - name: List Output Directory
+        run: |
+          ls -R kernel/out
+
+      # Step 9: Verify DTB files
+      - name: Check for DTB Files
+        run: |
+          echo "Checking for DTB files:"
+          ls kernel/out/arch/arm64/boot/dts/*.dtb || echo "No DTB files found"
+
+      # Step 10: Create ramdisk for boot.img
+      - name: Create Ramdisk
+        run: |
+          cd kernel
+          mkdir ramdisk
+          cd ramdisk
+          mkdir -p {init,sbin,dev,proc,sys,run,tmp}
+          touch init.rc
+          echo "on boot { mkdir /data; mkdir /cache; }" > init.rc
+          find . | cpio -H newc -o > ../ramdisk.cpio
+          cd ..
+
+      # Step 11: Compile boot.img
+      - name: Compile boot.img
+        run: |
+          cd kernel
+          mkbootimg --kernel out/arch/arm64/boot/Image.gz --ramdisk ramdisk.cpio --dtb out/arch/arm64/boot/dts/*.dtb --output boot.img --base ${BOARD_KERNEL_BASE} --cmdline "${BOARD_KERNEL_CMDLINE}"
+
+      # Step 12: Upload the compiled boot.img
+      - name: Upload Compiled boot.img
         uses: actions/upload-artifact@v3
         with:
-          name: kernel-image
-          path: kernel/out/arch/arm64/boot/Image.gz  # Or the appropriate path for the kernel image
+          name: boot-image
+          path: kernel/boot.img
