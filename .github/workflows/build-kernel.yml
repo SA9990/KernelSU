@@ -3,10 +3,10 @@ name: Kernel Build
 on:
   push:
     branches:
-      - main      # Change this to the branch you want to trigger builds on.
+      - main      # Adjust this to your desired branch.
   pull_request:
     branches:
-      - main      # You can also trigger on pull requests.
+      - main      # Trigger on pull requests to the main branch.
   workflow_dispatch:  # Allow manual triggering of the workflow.
 
 jobs:
@@ -14,47 +14,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the current repository (contains kernel source or manifest)
+      # Step 1: Checkout the current repository
       - name: Checkout Repository
         uses: actions/checkout@v3
       
-      # Step 2 (Optional): Clone Kernel Source from External Repo (if not part of the repo)
+      # Step 2: Install required packages
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget curl unzip python3 zip
+
+      # Step 3: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
         run: |
-          if [ ! -d "arch" ]; then
-            git clone --depth=1 https://github.com/your-org/your-kernel-repo.git kernel
-            cd kernel
-          fi
+          git clone --depth=1 https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
+          cd kernel
 
-      # Step 3: Set up Proton Clang or Custom Clang toolchain
+      # Step 4: Download and Setup Custom Clang toolchain
       - name: Download and Setup Custom Clang
         run: |
           git clone https://github.com/kdrag0n/proton-clang.git --depth=1 clang
           export PATH=$(pwd)/clang/bin:$PATH
 
-      # Step 4: Set up environment variables
+      # Step 5: Set up environment variables
       - name: Set Up Environment Variables
         run: |
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-          export CLANG_TRIPLE=aarch64-linux-gnu-
-          export PATH=$(pwd)/clang/bin:$PATH
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "SUBARCH=arm64" >> $GITHUB_ENV
+          echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+          echo "CROSS_COMPILE_ARM32=arm-linux-gnueabi-" >> $GITHUB_ENV
+          echo "CLANG_TRIPLE=aarch64-linux-gnu-" >> $GITHUB_ENV
+          echo "PATH=$(pwd)/clang/bin:$PATH" >> $GITHUB_ENV
 
-      # Step 5: Configure the kernel (use device-specific defconfig)
+      # Step 6: Configure the kernel (use device-specific defconfig)
       - name: Configure Kernel
         run: |
-          make O=out <device_defconfig>   # Replace with your device's defconfig
+          cd kernel  # Change to the kernel directory
+          make O=out vendor/obiwan_defconfig   # Use the correct defconfig for your device
           
-      # Step 6: Compile the kernel with Clang
+      # Step 7: Compile the kernel with Clang
       - name: Compile Kernel
         run: |
+          cd kernel  # Ensure you are in the kernel directory
           make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1
 
-      # Step 7: Upload the compiled kernel artifacts (optional)
+      # Step 8: Upload the compiled kernel artifacts (optional)
       - name: Upload Compiled Kernel Image
         uses: actions/upload-artifact@v3
         with:
           name: kernel-image
-          path: out/arch/arm64/boot/Image.gz  # Or the appropriate path for the kernel image
+          path: kernel/out/arch/arm64/boot/Image.gz  # Or the appropriate path for the kernel image
