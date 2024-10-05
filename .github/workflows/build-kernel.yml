@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main      # You can also trigger on pull requests.
+  workflow_dispatch:  # Allow manual triggering of the workflow.
 
 jobs:
   build:
@@ -21,7 +22,7 @@ jobs:
       - name: Clone Kernel Source
         run: |
           if [ ! -d "arch" ]; then
-            git clone --depth=1 https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
+            git clone --depth=1 https://github.com/your-org/your-kernel-repo.git kernel
             cd kernel
           fi
 
@@ -44,7 +45,7 @@ jobs:
       # Step 5: Configure the kernel (use device-specific defconfig)
       - name: Configure Kernel
         run: |
-          make O=out vendor/obiwan_defconfig  # Replace with your device's defconfig
+          make O=out <device_defconfig>   # Replace with your device's defconfig
           
       # Step 6: Compile the kernel with Clang
       - name: Compile Kernel
