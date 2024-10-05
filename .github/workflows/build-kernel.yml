@@ -18,32 +18,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
-      # Step 2: Install required packages including cross-compiler
+      # Step 2: Install required dependencies
       - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio
+          sudo apt-get update && sudo apt-get install -y \
+            git wget curl unzip python3 zip \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio
 
-      # Step 3: Clone mkbootimg from BlissRoms
-      - name: Clone mkbootimg
-        run: |
-          git clone --depth=1 https://github.com/BlissRoms/platform_system_tools_mkbootimg.git mkbootimg
-          cd mkbootimg/universe
-          chmod +x mkbootimg
-          sudo mv mkbootimg /usr/local/bin/  # Move to a directory in your PATH
-
-      # Step 4: Clone Kernel Source from Bliss ROMs repository
-      - name: Clone Kernel Source
+      # Step 3: Clone Kernel Source and Clang Toolchain
+      - name: Clone Kernel Source and Clang
         run: |
           git clone --depth=1 https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
+          echo "$(pwd)/clang/bin" >> $GITHUB_PATH  # Update PATH for Clang
 
-      # Step 5: Download and Setup Custom Clang toolchain
-      - name: Download and Setup Custom Clang
-        run: |
-          git clone https://github.com/kdrag0n/proton-clang.git --depth=1 clang
-          export PATH=$(pwd)/clang/bin:$PATH
-
-      # Step 6: Set up environment variables
+      # Step 4: Set up environment variables
       - name: Set Up Environment Variables
         run: |
           echo "ARCH=arm64" >> $GITHUB_ENV
@@ -51,60 +40,43 @@ jobs:
           echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
           echo "CROSS_COMPILE_ARM32=arm-linux-gnueabi-" >> $GITHUB_ENV
           echo "CLANG_TRIPLE=aarch64-linux-gnu-" >> $GITHUB_ENV
-          echo "BOARD_KERNEL_BASE=0x00000000" >> $GITHUB_ENV
-          echo "BOARD_KERNEL_CMDLINE='androidboot.console=ttyMSM0 androidboot.hardware=qcom androidboot.memcg=1 androidboot.usbcontroller=a800000.dwc3 cgroup.memory=nokmem,nosocket console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa90000 loop.max_part=7 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 reboot=panic_warm service_locator.enable=1 swiotlb=2048'" >> $GITHUB_ENV
-          echo "BOARD_KERNEL_PAGESIZE=4096" >> $GITHUB_ENV
-          echo "BOARD_KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
-          echo "TARGET_KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV  # Use vendor/obiwan_defconfig
+          echo "TARGET_KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV
           echo "TARGET_KERNEL_SOURCE=kernel/asus/sm8250" >> $GITHUB_ENV
           echo "TARGET_KERNEL_CLANG_VERSION=r416183b1" >> $GITHUB_ENV
           echo "TARGET_KERNEL_LLVM_BINUTILS=false" >> $GITHUB_ENV
-          echo "PATH=$(pwd)/clang/bin:$PATH" >> $GITHUB_ENV
 
-      # Step 7: Configure the kernel
-      - name: Configure Kernel
+      # Step 5: Configure and Compile the Kernel
+      - name: Configure and Compile Kernel
         run: |
-          cd kernel  # Change to the kernel directory
-          make O=out ${TARGET_KERNEL_CONFIG}   # Use the specified defconfig for your device
-          
-      # Step 8: Compile the kernel with Clang
-      - name: Compile Kernel
-        run: |
-          cd kernel  # Ensure you are in the kernel directory
-          make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1
+          cd kernel
+          make O=out ${TARGET_KERNEL_CONFIG} && make -j$(nproc) O=out ARCH=arm64 CC=clang LLVM=1  # Configure and Compile kernel
 
-      # Step 9: Check output directory for compiled files
-      - name: List Output Directory
-        run: |
-          ls -R kernel/out
-
-      # Step 10: Verify DTB files
+      # Step 6: Verify DTB Files
       - name: Check for DTB Files
         run: |
-          echo "Checking for DTB files:"
-          ls kernel/out/arch/arm64/boot/dts/*.dtb || echo "No DTB files found"
+          echo "Checking for DTB files..."
+          if ls kernel/out/arch/arm64/boot/dts/*.dtb 1> /dev/null 2>&1; then
+            echo "DTB files found."
+          else
+            echo "No DTB files found." && exit 1
+          fi
 
-      # Step 11: Create ramdisk for boot.img
-      - name: Create Ramdisk
+      # Step 7: Create AnyKernel3 Zip
+      - name: Create AnyKernel3 Zip
         run: |
-          cd kernel
-          mkdir ramdisk
-          cd ramdisk
-          mkdir -p {init,sbin,dev,proc,sys,run,tmp}
-          touch init.rc
-          echo "on boot { mkdir /data; mkdir /cache; }" > init.rc
-          find . | cpio -H newc -o > ../ramdisk.cpio
-          cd ..
+          mkdir -p AnyKernel3/ramdisk
+          cd AnyKernel3
+          git clone https://github.com/AnyKernel/AnyKernel3.git .
+          # Copy the compiled kernel image and DTB files into the ramdisk
+          cp ../kernel/out/arch/arm64/boot/Image ramdisk/  # Include the compiled kernel image
+          cp ../kernel/out/arch/arm64/boot/dts/*.dtb ramdisk/  # Include all DTB files
+          cp -r ramdisk/* .  # Move contents of ramdisk to AnyKernel root
+          rm -rf ramdisk  # Clean up the temporary ramdisk directory
+          zip -r AnyKernel3.zip * -x ".git*"  # Create the AnyKernel3 zip
 
-      # Step 12: Compile boot.img
-      - name: Compile boot.img
-        run: |
-          cd kernel
-          mkbootimg --kernel out/arch/arm64/boot/Image.gz --ramdisk ramdisk.cpio --dtb out/arch/arm64/boot/dts/*.dtb --output boot.img --base ${BOARD_KERNEL_BASE} --cmdline "${BOARD_KERNEL_CMDLINE}"
-
-      # Step 13: Upload the compiled boot.img
-      - name: Upload Compiled boot.img
+      # Step 8: Upload the AnyKernel3 zip
+      - name: Upload AnyKernel3 Zip
         uses: actions/upload-artifact@v3
         with:
-          name: boot-image
-          path: kernel/boot.img
+          name: anykernel3-zip
+          path: AnyKernel3/AnyKernel3.zip
