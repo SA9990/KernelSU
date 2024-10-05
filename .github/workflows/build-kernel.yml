@@ -18,11 +18,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
-      # Step 2: Install required packages including cross-compiler
+      # Step 2: Install required packages including cross-compiler and mkbootimg
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git wget curl unzip python3 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio
+          # Install additional tools for building boot image
+          sudo apt-get install -y android-tools-fsutils  # This includes mkbootimg
 
       # Step 3: Clone Kernel Source from Bliss ROMs repository
       - name: Clone Kernel Source
