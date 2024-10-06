@@ -1,73 +1,51 @@
-name: Build Kernel
+name: Setup Kernel Configuration
 
 on:
   push:
     branches:
-      - universe-old
+      - main
+      - dev  # Add any other branches you want to trigger the workflow on
   pull_request:
     branches:
-      - universe-old
-  workflow_dispatch:  # Allows manual triggering
+      - main
+      - dev  # Trigger on pull requests targeting these branches
+  schedule:
+    - cron: '0 0 * * 0'  # Runs every Sunday at midnight UTC
+  workflow_dispatch:  # Allows for manual triggering from the GitHub UI
 
 jobs:
-  build:
+  configure:
     runs-on: ubuntu-latest
-    
+
+    env:
+      KERNEL_CONFIG: your_kernel_config  # Replace with your kernel config
+      ARCH: arm  # Replace with your architecture
+      ADD_KPROBES_CONFIG: true  # Change as needed
+
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v2
-      
-    - name: Set up Environment
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git \
-          ccache \
-          lld \
-          clang \
-          make \
-          python3 \
-          python3-pip \
-          libncurses-dev \
-          bison \
-          flex \
-          libssl-dev \
-          libelf-dev \
-          git
-    
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+      - name: Checkout Code
+        uses: actions/checkout@v2
 
-    - name: Clean Previous Build Outputs
-      run: |
-        cd ${{ github.workspace }}/kernel
-        make clean  # Clean up any previous build artifacts
+      - name: Setup Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git libncurses-dev bison flex libssl-dev libelf-dev
 
-    - name: Clone Kernel Source
-      run: |
-        git clone --depth=1 -b universe-old https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git ${{ github.workspace }}/kernel
-    
-    - name: Set Up Clang
-      run: |
-        git clone --depth=1 -b universe https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1.git ${{ github.workspace }}/clang
-        export PATH="${{ github.workspace }}/clang/bin:$PATH"
+      - name: Setup Configuration for Kernel
+        run: |
+          # Ensure Device Tree options are enabled
+          echo "CONFIG_OF=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+          echo "CONFIG_OF_OVERLAY=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+          echo "CONFIG_DTC=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+          echo "CONFIG_ARM_OF=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
 
-    - name: Configure Kernel
-      run: |
-        cd ${{ github.workspace }}/kernel
-        export DTS_LOCATION=arch/arm64/boot/dts/vendor  # Specify DTS location
-        make O=out ARCH=arm64 ${KERNEL_CONFIG} DTB=${DTS_LOCATION}/your_device.dtb
+          # Add other necessary configurations...
+          if [ ${{ env.ADD_KPROBES_CONFIG }} = true ]; then
+              echo "CONFIG_MODULES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+              echo "CONFIG_KPROBES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+          fi
 
-    - name: Build Kernel
-      run: |
-        cd ${{ github.workspace }}/kernel
-        make O=out ARCH=arm64 Image
-        # Add other build targets if necessary
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v3  # Updated to v3
-      with:
-        name: kernel-image
-        path: ${{ github.workspace }}/kernel/out/Image
+      - name: Display Kernel Configuration
+        run: |
+          echo "Kernel configuration updated:"
+          cat arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
