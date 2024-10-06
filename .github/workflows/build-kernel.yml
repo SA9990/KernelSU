@@ -27,6 +27,7 @@ jobs:
           clang \
           make \
           python3 \
+          python3-pip \
           libncurses-dev \
           bison \
           flex \
@@ -34,6 +35,16 @@ jobs:
           libelf-dev \
           git
     
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Clean Previous Build Outputs
+      run: |
+        cd ${{ github.workspace }}/kernel
+        make clean  # Clean up any previous build artifacts
+
     - name: Clone Kernel Source
       run: |
         git clone --depth=1 -b universe-old https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git ${{ github.workspace }}/kernel
