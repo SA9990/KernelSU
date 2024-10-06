@@ -1,51 +1,38 @@
-name: Setup Kernel Configuration
+name: Add Device Tree Configuration
 
 on:
-  push:
-    branches:
-      - main
-      - dev  # Add any other branches you want to trigger the workflow on
   pull_request:
     branches:
-      - main
-      - dev  # Trigger on pull requests targeting these branches
-  schedule:
-    - cron: '0 0 * * 0'  # Runs every Sunday at midnight UTC
-  workflow_dispatch:  # Allows for manual triggering from the GitHub UI
+      - main  # Change this to the appropriate branch if needed
 
 jobs:
-  configure:
+  add_device_tree_config:
     runs-on: ubuntu-latest
 
-    env:
-      KERNEL_CONFIG: your_kernel_config  # Replace with your kernel config
-      ARCH: arm  # Replace with your architecture
-      ADD_KPROBES_CONFIG: true  # Change as needed
-
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v2
-
-      - name: Setup Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git libncurses-dev bison flex libssl-dev libelf-dev
 
       - name: Setup Configuration for Kernel
         run: |
           # Ensure Device Tree options are enabled
-          echo "CONFIG_OF=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-          echo "CONFIG_OF_OVERLAY=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-          echo "CONFIG_DTC=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-          echo "CONFIG_ARM_OF=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-
-          # Add other necessary configurations...
-          if [ ${{ env.ADD_KPROBES_CONFIG }} = true ]; then
-              echo "CONFIG_MODULES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-              echo "CONFIG_KPROBES=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+          echo "CONFIG_OF=y" >> vendor/obiwan_defconfig
+          echo "CONFIG_OF_OVERLAY=y" >> vendor/obiwan_defconfig
+          echo "CONFIG_DTC=y" >> vendor/obiwan_defconfig
+          echo "CONFIG_ARM_OF=y" >> vendor/obiwan_defconfig
+          
+          # Optionally add kprobes configuration if needed
+          if [ "${{ secrets.ADD_KPROBES_CONFIG }}" = "true" ]; then
+              echo "CONFIG_MODULES=y" >> vendor/obiwan_defconfig
+              echo "CONFIG_KPROBES=y" >> vendor/obiwan_defconfig
           fi
 
-      - name: Display Kernel Configuration
+      - name: Commit Changes
         run: |
-          echo "Kernel configuration updated:"
-          cat arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add vendor/obiwan_defconfig
+          git commit -m "Add Device Tree configuration options"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
