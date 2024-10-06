@@ -1,12 +1,61 @@
-- name: Build Kernel
-  run: |
-    cd kernel
-    make O=out $KERNEL_CONFIG
-    if [ -d "$DTS_LOCATION" ]; then
-      echo "Building Device Tree..."
-      make O=out dtbs
-    else
-      echo "DTS location not found: $DTS_LOCATION"
-    fi
-    echo "Compiling Kernel with reduced parallel jobs..."
-    make O=out -j2 Image  # Reduce the number of jobs to 2
+name: Build Kernel
+
+on:
+  push:
+    branches:
+      - universe-old
+  pull_request:
+    branches:
+      - universe-old
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+      
+    - name: Set up Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          ccache \
+          lld \
+          clang \
+          make \
+          python3 \
+          libncurses-dev \
+          bison \
+          flex \
+          libssl-dev \
+          libelf-dev \
+          git
+    
+    - name: Clone Kernel Source
+      run: |
+        git clone --depth=1 -b universe-old https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git ${{ github.workspace }}/kernel
+    
+    - name: Set Up Clang
+      run: |
+        git clone --depth=1 -b universe https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1.git ${{ github.workspace }}/clang
+        export PATH="${{ github.workspace }}/clang/bin:$PATH"
+
+    - name: Configure Kernel
+      run: |
+        cd ${{ github.workspace }}/kernel
+        export DTS_LOCATION=arch/arm64/boot/dts/vendor  # Specify DTS location
+        make O=out ARCH=arm64 ${KERNEL_CONFIG} DTB=${DTS_LOCATION}/your_device.dtb
+
+    - name: Build Kernel
+      run: |
+        cd ${{ github.workspace }}/kernel
+        make O=out ARCH=arm64 Image
+        # Add other build targets if necessary
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: kernel-image
+        path: ${{ github.workspace }}/kernel/out/Image
