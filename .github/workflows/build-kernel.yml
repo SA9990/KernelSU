@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - universe-old
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   build:
