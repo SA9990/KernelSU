@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main  # Change this to the appropriate branch if needed
+  workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
   add_device_tree_config:
@@ -32,7 +33,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add vendor/obiwan_defconfig
-          git commit -m "Add Device Tree configuration options"
+          git commit -m "Add Device Tree configuration options" || echo "No changes to commit"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
