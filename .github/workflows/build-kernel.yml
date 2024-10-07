@@ -177,4 +177,63 @@ jobs:
           if [[ ${{ env.CUSTOM_GCC_32_SOURCE }} =~ git ]]; then
               if [[ ${{ env.CUSTOM_GCC_32_SOURCE }} == *'.tar.gz' ]]; then
                 wget -O gcc-32.tar.gz ${{ env.CUSTOM_GCC_32_SOURCE }}
-                mkdir gcc-
+                mkdir gcc-32
+                tar -C gcc-32/ -zxvf gcc-32.tar.gz
+              else
+                git clone ${{ env.CUSTOM_GCC_32_SOURCE }} -b ${{ env.CUSTOM_GCC_32_BRANCH }} gcc-32 --depth=1
+              fi
+          else
+              wget -O gcc-32.zip ${{ env.CUSTOM_GCC_32_SOURCE }}
+              mkdir gcc-32
+              unzip gcc-32.zip -d gcc-32/
+          fi
+          echo "GCC_32=CROSS_COMPILE_ARM32=$GITHUB_WORKSPACE/kernel_workspace/gcc-32/bin/${{ env.CUSTOM_GCC_32_BIN }}" >> $GITHUB_ENV
+        fi
+        echo "Custom GCC downloaded."
+
+    - name: Clone Kernel Source
+      run: |
+        echo "Cloning Kernel Source..."
+        cd $GITHUB_WORKSPACE/kernel_workspace
+        git clone ${{ env.KERNEL_SOURCE }} -b ${{ env.KERNEL_SOURCE_BRANCH }} kernel --depth=1
+        echo "Kernel Source cloned."
+
+    - name: Kernel Configuration
+      run: |
+        echo "Applying Kernel Configuration..."
+        cd $GITHUB_WORKSPACE/kernel_workspace/kernel
+        cp ${{ env.KERNEL_CONFIG }} .config
+        if [ ${{ env.ADD_LOCALVERSION_TO_FILENAME }} == "true" ]; then
+            echo "CONFIG_LOCALVERSION=" >> .config
+        fi
+        if [ ${{ env.EXTRA_CMDS }} != "" ]; then
+            eval ${{ env.EXTRA_CMDS }}
+        fi
+        echo "Kernel Configuration applied."
+
+    - name: Build Kernel
+      run: |
+        echo "Starting Kernel Build..."
+        cd $GITHUB_WORKSPACE/kernel_workspace/kernel
+        make -j$(nproc) O=out ARCH=${{ env.ARCH }} CROSS_COMPILE=$CROSS_COMPILE
+        echo "Kernel Build completed."
+
+    - name: Output Check
+      run: |
+        echo "Checking output files..."
+        if [[ ! -f out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} ]]; then
+            echo "Error: Kernel image not found!"
+            exit 1
+        fi
+        echo "Output files check passed."
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-artifacts
+        path: |
+          out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }}
+          out/arch/${{ env.ARCH }}/boot/*.dtbo
+          out/arch/${{ env.ARCH }}/boot/Image
+          out/arch/${{ env.ARCH }}/boot/*.img
+      run: echo "Kernel artifacts uploaded."
