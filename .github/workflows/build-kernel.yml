@@ -50,7 +50,6 @@ jobs:
       - name: Clean the build environment
         run: |
           cd $KERNEL_DIR
-          make mrproper
           make O=out clean
 
       - name: Create new kernel configuration
