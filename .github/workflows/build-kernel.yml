@@ -1,39 +1,86 @@
-name: Add Device Tree Configuration
+name: Android Kernel Build
 
 on:
+  push:
+    branches:
+      - main  # Trigger on push to the main branch
+      - "feature/*"  # Trigger on push to any branch starting with 'feature/'
   pull_request:
     branches:
-      - main  # Change this to the appropriate branch if needed
-  workflow_dispatch:  # Allows manual triggering of the workflow
+      - main  # Trigger on pull requests targeting the main branch
+  workflow_dispatch:  # Allow manual triggering of the workflow
 
 jobs:
-  add_device_tree_config:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+      - name: Checkout source code
+        uses: actions/checkout@v3
 
-      - name: Setup Configuration for Kernel
+      - name: Clone Kernel Source
         run: |
-          # Ensure Device Tree options are enabled
-          echo "CONFIG_OF=y" >> vendor/obiwan_defconfig
-          echo "CONFIG_OF_OVERLAY=y" >> vendor/obiwan_defconfig
-          echo "CONFIG_DTC=y" >> vendor/obiwan_defconfig
-          echo "CONFIG_ARM_OF=y" >> vendor/obiwan_defconfig
-          
-          # Optionally add kprobes configuration if needed
-          if [ "${{ secrets.ADD_KPROBES_CONFIG }}" = "true" ]; then
-              echo "CONFIG_MODULES=y" >> vendor/obiwan_defconfig
-              echo "CONFIG_KPROBES=y" >> vendor/obiwan_defconfig
-          fi
+          git clone https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250.git kernel
+          cd kernel
 
-      - name: Commit Changes
+      - name: Set up environment
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add vendor/obiwan_defconfig
-          git commit -m "Add Device Tree configuration options" || echo "No changes to commit"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex build-essential ccache libncurses-dev libssl-dev curl zip unzip
+
+      - name: Download AOSP Clang
+        run: |
+          mkdir -p clang && cd clang
+          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784e.tar.gz
+          tar -xf clang-r450784e.tar.gz
+          cd ..
+
+      - name: Download Proton Clang
+        run: |
+          mkdir -p proton_clang && cd proton_clang
+          curl -LO https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.tar.gz
+          tar -xf master.tar.gz --strip-components=1
+          cd ..
+
+      - name: Set up build environment variables
+        run: |
+          export CLANG_PATH=$(pwd)/clang
+          export PROTON_CLANG_PATH=$(pwd)/proton_clang
+          export PATH="${CLANG_PATH}/bin:${PROTON_CLANG_PATH}/bin:${PATH}"
+          export KERNEL_DIR=$(pwd)/kernel
+          export DEFCONFIG=vendor/obiwan_defconfig
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=${CLANG_PATH}/bin/aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=${CLANG_PATH}/bin/arm-linux-gnueabi-
+          export CC=${PROTON_CLANG_PATH}/bin/clang
+
+      - name: Clean the build environment
+        run: |
+          cd $KERNEL_DIR
+          make mrproper
+          make O=out clean
+
+      - name: Create new kernel configuration
+        run: |
+          cd $KERNEL_DIR
+          make O=out ${DEFCONFIG}  # Start with the base defconfig
+          make O=out savedefconfig  # Save the minimal current configuration as defconfig
+          cp out/defconfig arch/arm64/configs/new_defconfig  # Save as new defconfig
+
+      - name: Build the kernel with new configuration
+        run: |
+          cd $KERNEL_DIR
+          make O=out new_defconfig  # Build using the new kernel configuration
+          make -j$(nproc) O=out \
+            ARCH=arm64 \
+            CC=$CC \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=${CROSS_COMPILE} \
+            CROSS_COMPILE_ARM32=${CROSS_COMPILE_ARM32}
+
+      - name: Upload compiled kernel
+        uses: actions/upload-artifact@v3
+        with:
+          name: compiled-kernel
+          path: kernel/out/arch/arm64/boot/
