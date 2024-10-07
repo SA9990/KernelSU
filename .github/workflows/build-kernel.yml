@@ -28,6 +28,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc bison flex build-essential ccache libncurses-dev libssl-dev curl zip unzip
 
+      - name: Create Swap Space
+        run: |
+          sudo fallocate -l 8G /swapfile  # Create an 8 GB swap file
+          sudo chmod 600 /swapfile        # Set correct permissions
+          sudo mkswap /swapfile            # Set up the swap file
+          sudo swapon /swapfile            # Enable the swap file
+          swapon --show                    # Display the swap space
+
       - name: Download Proton Clang
         run: |
           mkdir -p proton_clang && cd proton_clang
@@ -46,11 +54,15 @@ jobs:
           export CROSS_COMPILE=${PROTON_CLANG_PATH}/bin/aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=${PROTON_CLANG_PATH}/bin/arm-linux-gnueabi-
           export CC=${PROTON_CLANG_PATH}/bin/clang
+          export CCACHE_DIR=$(pwd)/ccache  # Set ccache directory
+          export CCACHE_SIZE=2G  # Limit ccache size to 2GB
+          mkdir -p $CCACHE_DIR
+          ccache -M $CCACHE_SIZE  # Initialize ccache
 
       - name: Clean the build environment
         run: |
           cd $KERNEL_DIR
-          make O=out clean
+          rm -rf out  # Manually remove the output directory
 
       - name: Create new kernel configuration
         run: |
@@ -63,15 +75,27 @@ jobs:
         run: |
           cd $KERNEL_DIR
           make O=out new_defconfig  # Build using the new kernel configuration
-          make -j$(nproc) O=out \
+          make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=$CC \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=${CROSS_COMPILE} \
-            CROSS_COMPILE_ARM32=${CROSS_COMPILE_ARM32}
+            CROSS_COMPILE_ARM32=${CROSS_COMPILE_ARM32} \
+            CC="ccache $CC" | tee build.log  # Use ccache for the build
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-log
+          path: kernel/build.log
 
       - name: Upload compiled kernel
         uses: actions/upload-artifact@v3
         with:
           name: compiled-kernel
           path: kernel/out/arch/arm64/boot/
+
+      - name: Cleanup Swap Space
+        run: |
+          sudo swapoff /swapfile    # Disable the swap file
+          sudo rm /swapfile          # Remove the swap file
