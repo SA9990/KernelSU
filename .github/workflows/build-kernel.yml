@@ -1,4 +1,4 @@
-name: Android Kernel Build
+name: Android Kernel Build with Proton Clang
 
 on:
   push:
@@ -28,13 +28,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc bison flex build-essential ccache libncurses-dev libssl-dev curl zip unzip
 
-      - name: Download AOSP Clang
-        run: |
-          mkdir -p clang && cd clang
-          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784e.tar.gz
-          tar -xf clang-r450784e.tar.gz
-          cd ..
-
       - name: Download Proton Clang
         run: |
           mkdir -p proton_clang && cd proton_clang
@@ -44,15 +37,14 @@ jobs:
 
       - name: Set up build environment variables
         run: |
-          export CLANG_PATH=$(pwd)/clang
           export PROTON_CLANG_PATH=$(pwd)/proton_clang
-          export PATH="${CLANG_PATH}/bin:${PROTON_CLANG_PATH}/bin:${PATH}"
+          export PATH="${PROTON_CLANG_PATH}/bin:${PATH}"
           export KERNEL_DIR=$(pwd)/kernel
           export DEFCONFIG=vendor/obiwan_defconfig
           export ARCH=arm64
           export SUBARCH=arm64
-          export CROSS_COMPILE=${CLANG_PATH}/bin/aarch64-linux-gnu-
-          export CROSS_COMPILE_ARM32=${CLANG_PATH}/bin/arm-linux-gnueabi-
+          export CROSS_COMPILE=${PROTON_CLANG_PATH}/bin/aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=${PROTON_CLANG_PATH}/bin/arm-linux-gnueabi-
           export CC=${PROTON_CLANG_PATH}/bin/clang
 
       - name: Clean the build environment
