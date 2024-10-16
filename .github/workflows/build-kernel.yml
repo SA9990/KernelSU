@@ -14,17 +14,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
       - name: Install All Required Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             build-essential \
-            gcc-aarch64-linux-gnu \
+            gcc-11-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi \
             libncurses-dev \
             bison \
@@ -77,11 +72,7 @@ jobs:
             python-is-python3 \
             lib32z1-dev \
             lib32ncurses6 \
-            lib32stdc++6 \
-            gcc-multilib \
-            g++-multilib \
-            libreadline8 \
-            libreadline-dev
+            lib32stdc++6
 
       - name: Set up Environment Variables
         run: |
