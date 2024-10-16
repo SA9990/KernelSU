@@ -76,24 +76,29 @@ jobs:
 
       - name: Set up Environment Variables
         run: |
-          echo "KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> config.env
-          echo "KERNEL_SOURCE_BRANCH=universe" >> config.env
-          echo "KERNEL_CONFIG=vendor/obiwan_defconfig" >> config.env
-          echo "KERNEL_IMAGE_NAME=Image" >> config.env
-          echo "ARCH=arm64" >> config.env
-          echo "ADD_LOCALVERSION_TO_FILENAME=false" >> config.env
-          echo "EXTRA_CMDS:LD=ld.lld" >> config.env
-          echo "USE_CUSTOM_CLANG=true" >> config.env
-          echo "CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> config.env
-          echo "CUSTOM_CLANG_BRANCH=universe" >> config.env
-          echo "CLANG_BRANCH=master-kernel-build-2021" >> config.env
-          echo "CLANG_VERSION=r487747c" >> config.env
-          echo "ENABLE_GCC_ARM64=true" >> config.env
-          echo "ENABLE_GCC_ARM32=true" >> config.env
-          echo "ENABLE_KERNELSU=false" >> config.env
-          echo "DISABLE-LTO=false" >> config.env
-          echo "ENABLE_CCACHE=true" >> config.env
-          echo "BUILD_BOOT_IMG=true" >> config.env
+          echo "KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE_BRANCH=universe" >> $GITHUB_ENV
+          echo "KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV
+          echo "KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "ADD_LOCALVERSION_TO_FILENAME=false" >> $GITHUB_ENV
+          echo "EXTRA_CMDS:LD=ld.lld" >> $GITHUB_ENV
+          echo "USE_CUSTOM_CLANG=true" >> $GITHUB_ENV
+          echo "CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> $GITHUB_ENV
+          echo "CUSTOM_CLANG_BRANCH=universe" >> $GITHUB_ENV
+          echo "CLANG_BRANCH=master-kernel-build-2021" >> $GITHUB_ENV
+          echo "CLANG_VERSION=r487747c" >> $GITHUB_ENV
+          echo "ENABLE_GCC_ARM64=true" >> $GITHUB_ENV
+          echo "ENABLE_GCC_ARM32=true" >> $GITHUB_ENV
+          echo "ENABLE_KERNELSU=false" >> $GITHUB_ENV
+          echo "DISABLE-LTO=false" >> $GITHUB_ENV
+          echo "ENABLE_CCACHE=true" >> $GITHUB_ENV
+          echo "BUILD_BOOT_IMG=true" >> $GITHUB_ENV
+
+      - name: Display Environment Variables
+        run: |
+          echo "KERNEL_SOURCE: $KERNEL_SOURCE"
+          echo "KERNEL_SOURCE_BRANCH: $KERNEL_SOURCE_BRANCH"
 
       - name: Clone Kernel Source
         run: |
