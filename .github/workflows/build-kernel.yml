@@ -1,21 +1,10 @@
-name: Build ARM64 Kernel
+name: Android Kernel Build
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - universe
-  pull_request:
-    branches:
-      - universe
-
-env:
-  CONFIG_ENV: config.env
-  KERNEL_SOURCE: https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250
-  KERNEL_SOURCE_BRANCH: universe
-  KERNEL_CONFIG: vendor/obiwan_defconfig
-  KERNEL_IMAGE_NAME: Image
-  ARCH: arm64
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,12 +12,14 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      - name: Set Up Configuration
-        run: source $CONFIG_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-      - name: Install Required Dependencies
+      - name: Install All Required Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -47,53 +38,99 @@ jobs:
             wget \
             curl \
             python3 \
+            python3-pip \
             zip \
+            unzip \
             automake \
             autoconf \
             pkg-config \
             device-tree-compiler \
             rsync \
-            dos2unix
+            dos2unix \
+            lld \
+            u-boot-tools \
+            zlib1g-dev \
+            libxml2-utils \
+            xsltproc \
+            openjdk-11-jdk \
+            repo \
+            gperf \
+            cmake \
+            ninja-build \
+            liblz4-tool \
+            squashfs-tools \
+            genisoimage \
+            libffi-dev \
+            libtool \
+            libc6-dev \
+            make \
+            lzma \
+            xz-utils \
+            imagemagick \
+            sudo \
+            jq \
+            openssl \
+            ccache \
+            parallel \
+            apt-utils \
+            patchelf \
+            python-is-python3 \
+            lib32z1-dev \
+            lib32ncurses6 \
+            lib32stdc++6 \
+            gcc-multilib \
+            g++-multilib \
+            libreadline8 \
+            libreadline-dev
+
+      - name: Set up Environment Variables
+        run: |
+          echo "KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> config.env
+          echo "KERNEL_SOURCE_BRANCH=universe" >> config.env
+          echo "KERNEL_CONFIG=vendor/obiwan_defconfig" >> config.env
+          echo "KERNEL_IMAGE_NAME=Image" >> config.env
+          echo "ARCH=arm64" >> config.env
+          echo "ADD_LOCALVERSION_TO_FILENAME=false" >> config.env
+          echo "EXTRA_CMDS:LD=ld.lld" >> config.env
+          echo "USE_CUSTOM_CLANG=true" >> config.env
+          echo "CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> config.env
+          echo "CUSTOM_CLANG_BRANCH=universe" >> config.env
+          echo "CLANG_BRANCH=master-kernel-build-2021" >> config.env
+          echo "CLANG_VERSION=r487747c" >> config.env
+          echo "ENABLE_GCC_ARM64=true" >> config.env
+          echo "ENABLE_GCC_ARM32=true" >> config.env
+          echo "ENABLE_KERNELSU=false" >> config.env
+          echo "DISABLE-LTO=false" >> config.env
+          echo "ENABLE_CCACHE=true" >> config.env
+          echo "BUILD_BOOT_IMG=true" >> config.env
 
       - name: Clone Kernel Source
-        run: git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
-
-      - name: Set Up Clang Toolchain
         run: |
-          if [ "$USE_CUSTOM_CLANG" = "true" ]; then
-            git clone -b $CUSTOM_CLANG_BRANCH $CUSTOM_CLANG_SOURCE clang
-            export PATH="$HOME/clang/bin:$PATH"
-            export LD=ld.lld
-            export CC=clang
-            export CXX=clang++
-            export AR=llvm-ar
-            export NM=llvm-nm
-            export OBJCOPY=llvm-objcopy
-            export OBJDUMP=llvm-objdump
-            export STRIP=llvm-strip
-            export CLANG_TRIPLE=aarch64-linux-gnu-
-          fi
+          git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
+          cd kernel_source
+          git submodule update --init --recursive
 
-      - name: Kernel Build Preparation
+      - name: Build Device Tree
         run: |
           cd kernel_source
-          export ARCH=$ARCH
           make O=out $KERNEL_CONFIG
+          make O=out dtbs
 
       - name: Build Kernel
         run: |
           cd kernel_source
-          make O=out ARCH=$ARCH CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- -j$(nproc)
+          make O=out ARCH=$ARCH CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
 
-      - name: Build Device Tree Blob (DTB) and DTS
-        run: |
-          cd kernel_source
-          make O=out dtbs
-
-      - name: Upload Kernel Artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: Kernel-Artifacts
+          name: kernel-artifacts
           path: |
             kernel_source/out/arch/arm64/boot/Image
-            kernel_source/out/arch/arm64/boot/dts
+            kernel_source/out/arch/arm64/boot/dts/*
+            kernel_source/out/arch/arm64/boot/dts/overlays/*
+
+      - name: Clean Up
+        run: |
+          cd kernel_source
+          make O=out clean
