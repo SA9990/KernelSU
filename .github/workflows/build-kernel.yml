@@ -1,59 +1,81 @@
-name: Kernel Build with DTS and DTB Handling
+name: Kernel Build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:  # This enables manual triggering of the workflow
+      - universe  # Include any other branches as needed
 
 jobs:
-  build:
+  build_kernel:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      # Step 2: Set up the build environment
-      - name: Set up build environment
+      - name: Set up environment
+        run: |
+          echo "Setting up environment variables"
+          echo "export CONFIG_ENV=config.env" >> $GITHUB_ENV
+          echo "export ARCH=arm64" >> $GITHUB_ENV
+          echo "export KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> $GITHUB_ENV
+          echo "export KERNEL_SOURCE_BRANCH=universe" >> $GITHUB_ENV
+          echo "export KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV
+          echo "export KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
+          echo "export ADD_LOCALVERSION_TO_FILENAME=false" >> $GITHUB_ENV
+          echo "export EXTRA_CMDS=\"LD=ld.lld\"" >> $GITHUB_ENV
+          echo "export USE_CUSTOM_CLANG=true" >> $GITHUB_ENV
+          echo "export CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> $GITHUB_ENV
+          echo "export CUSTOM_CLANG_BRANCH=universe" >> $GITHUB_ENV
+          echo "export CUSTOM_CMDS=\"CLANG_TRIPLE=aarch64-linux-gnu-\"" >> $GITHUB_ENV
+          echo "export CLANG_BRANCH=master-kernel-build-2021" >> $GITHUB_ENV
+          echo "export CLANG_VERSION=r487747c" >> $GITHUB_ENV
+          echo "export ENABLE_GCC_ARM64=true" >> $GITHUB_ENV
+          echo "export ENABLE_GCC_ARM32=true" >> $GITHUB_ENV
+          echo "export ENABLE_KERNELSU=false" >> $GITHUB_ENV
+          echo "export REMOVE_UNUSED_PACKAGES=true" >> $GITHUB_ENV
+          echo "export ENABLE_CCACHE=true" >> $GITHUB_ENV
+          echo "export NEED_DTBO=false" >> $GITHUB_ENV
+          echo "export BUILD_BOOT_IMG=true" >> $GITHUB_ENV
+          echo "export SOURCE_BOOT_IMAGE=https://sourceforge.net/projects/payload/files/Boot/boot.img" >> $GITHUB_ENV
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu bison flex libssl-dev make
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git python3 device-tree-compiler
 
-      # Step 3: Build the kernel
+      - name: Clone Kernel Source
+        run: |
+          git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
+          cd kernel_source
+          git submodule update --init --recursive
+
+      - name: Build Device Tree Source (DTS)
+        run: |
+          cd kernel_source
+          make O=out dtbs  # Build the device tree blobs
+
       - name: Build Kernel
         run: |
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          make vendor/obiwan_defconfig
-          make -j$(nproc)
+          cd kernel_source
+          make O=out $KERNEL_CONFIG
+          make O=out -j$(nproc)
 
-      # Step 4: DTS to DTB Compilation
-      - name: Compile DTS to DTB
-        run: |
-          dtb_output_dir=arch/arm64/boot/dts/vendor/
-          mkdir -p $dtb_output_dir
-          for dts_file in $(find . -name '*.dts'); do
-            dtb_file="${dts_file%.dts}.dtb"
-            dtc -I dts -O dtb -o "$dtb_output_dir/$(basename $dtb_file)" "$dts_file"
-          done
-
-      # Step 5: Copy DTB files to the correct location
-      - name: Post-build processing
-        run: |
-          dtb_destination_dir=arch/arm64/boot/dts/obiwan/
-          mkdir -p $dtb_destination_dir
-          cp arch/arm64/boot/dts/vendor/*.dtb $dtb_destination_dir
-
-      # Step 6: Upload the artifacts
-      - name: Upload Kernel and DTBs
+      - name: Upload Kernel Image
         uses: actions/upload-artifact@v3
         with:
-          name: kernel-and-dtbs
-          path: |
-            arch/arm64/boot/Image.gz
-            arch/arm64/boot/dts/obiwan/*.dtb
+          name: kernel-image
+          path: kernel_source/out/$KERNEL_IMAGE_NAME  # Update this path if necessary
+
+      - name: Upload Device Tree Blobs
+        uses: actions/upload-artifact@v3
+        with:
+          name: device-tree-blobs
+          path: kernel_source/out/arch/arm64/boot/dts/*.dtb  # Update this path if necessary
+
+      - name: Clean up
+        run: |
+          cd kernel_source
+          make clean
