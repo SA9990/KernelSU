@@ -18,28 +18,28 @@ jobs:
       - name: Set up environment
         run: |
           echo "Setting up environment variables"
-          echo "export CONFIG_ENV=config.env" >> $GITHUB_ENV
-          echo "export ARCH=arm64" >> $GITHUB_ENV
-          echo "export KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> $GITHUB_ENV
-          echo "export KERNEL_SOURCE_BRANCH=universe" >> $GITHUB_ENV
-          echo "export KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV
-          echo "export KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
-          echo "export ADD_LOCALVERSION_TO_FILENAME=false" >> $GITHUB_ENV
-          echo "export EXTRA_CMDS=\"LD=ld.lld\"" >> $GITHUB_ENV
-          echo "export USE_CUSTOM_CLANG=true" >> $GITHUB_ENV
-          echo "export CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> $GITHUB_ENV
-          echo "export CUSTOM_CLANG_BRANCH=universe" >> $GITHUB_ENV
-          echo "export CUSTOM_CMDS=\"CLANG_TRIPLE=aarch64-linux-gnu-\"" >> $GITHUB_ENV
-          echo "export CLANG_BRANCH=master-kernel-build-2021" >> $GITHUB_ENV
-          echo "export CLANG_VERSION=r487747c" >> $GITHUB_ENV
-          echo "export ENABLE_GCC_ARM64=true" >> $GITHUB_ENV
-          echo "export ENABLE_GCC_ARM32=true" >> $GITHUB_ENV
-          echo "export ENABLE_KERNELSU=false" >> $GITHUB_ENV
-          echo "export REMOVE_UNUSED_PACKAGES=true" >> $GITHUB_ENV
-          echo "export ENABLE_CCACHE=true" >> $GITHUB_ENV
-          echo "export NEED_DTBO=false" >> $GITHUB_ENV
-          echo "export BUILD_BOOT_IMG=true" >> $GITHUB_ENV
-          echo "export SOURCE_BOOT_IMAGE=https://sourceforge.net/projects/payload/files/Boot/boot.img" >> $GITHUB_ENV
+          echo "CONFIG_ENV=config.env" >> $GITHUB_ENV
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> $GITHUB_ENV
+          echo "KERNEL_SOURCE_BRANCH=universe" >> $GITHUB_ENV
+          echo "KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV
+          echo "KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
+          echo "ADD_LOCALVERSION_TO_FILENAME=false" >> $GITHUB_ENV
+          echo "EXTRA_CMDS=\"LD=ld.lld\"" >> $GITHUB_ENV
+          echo "USE_CUSTOM_CLANG=true" >> $GITHUB_ENV
+          echo "CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> $GITHUB_ENV
+          echo "CUSTOM_CLANG_BRANCH=universe" >> $GITHUB_ENV
+          echo "CUSTOM_CMDS=\"CLANG_TRIPLE=aarch64-linux-gnu-\"" >> $GITHUB_ENV
+          echo "CLANG_BRANCH=master-kernel-build-2021" >> $GITHUB_ENV
+          echo "CLANG_VERSION=r487747c" >> $GITHUB_ENV
+          echo "ENABLE_GCC_ARM64=true" >> $GITHUB_ENV
+          echo "ENABLE_GCC_ARM32=true" >> $GITHUB_ENV
+          echo "ENABLE_KERNELSU=false" >> $GITHUB_ENV
+          echo "REMOVE_UNUSED_PACKAGES=true" >> $GITHUB_ENV
+          echo "ENABLE_CCACHE=true" >> $GITHUB_ENV
+          echo "NEED_DTBO=false" >> $GITHUB_ENV
+          echo "BUILD_BOOT_IMG=true" >> $GITHUB_ENV
+          echo "SOURCE_BOOT_IMAGE=https://sourceforge.net/projects/payload/files/Boot/boot.img" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
@@ -47,6 +47,9 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git python3 device-tree-compiler
 
       - name: Clone Kernel Source
+        env:
+          KERNEL_SOURCE_BRANCH: ${{ env.KERNEL_SOURCE_BRANCH }}
+          KERNEL_SOURCE: ${{ env.KERNEL_SOURCE }}
         run: |
           git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
           cd kernel_source
