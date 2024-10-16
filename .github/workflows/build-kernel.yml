@@ -55,6 +55,11 @@ jobs:
           cd kernel_source
           git submodule update --init --recursive
 
+      - name: Generate Kernel Configuration
+        run: |
+          cd kernel_source
+          make O=out $KERNEL_CONFIG  # Generates the .config file
+
       - name: Build Device Tree Source (DTS)
         run: |
           cd kernel_source
@@ -63,8 +68,7 @@ jobs:
       - name: Build Kernel
         run: |
           cd kernel_source
-          make O=out $KERNEL_CONFIG
-          make O=out -j$(nproc)
+          make O=out -j$(nproc)  # Build the kernel image
 
       - name: Upload Kernel Image
         uses: actions/upload-artifact@v3
