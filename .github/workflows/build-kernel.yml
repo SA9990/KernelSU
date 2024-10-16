@@ -7,112 +7,53 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:  # This enables manual triggering of the workflow
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ARCH: arm64
-      KERNEL_IMAGE_NAME: Image.gz
-      KERNEL_CONFIG: vendor/obiwan_defconfig
-      NEED_DTBO: true
-      ENABLE_CCACHE: true
 
     steps:
-      # Checkout the repository
-      - name: Checkout repository
+      # Step 1: Checkout the code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Set up ccache
-      - name: Setup ccache
+      # Step 2: Set up the build environment
+      - name: Set up build environment
         run: |
-          sudo apt-get install ccache
-          export CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
-          ccache --max-size=10G
-          echo "export PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu bison flex libssl-dev make
 
-      # Install necessary packages and set up dependencies
-      - name: Install dependencies
+      # Step 3: Build the kernel
+      - name: Build Kernel
         run: |
-          sudo apt-get install -y gcc bc bison flex libelf-dev libssl-dev build-essential \
-              clang lld libncurses-dev ccache libncurses5-dev git
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          make vendor/obiwan_defconfig
+          make -j$(nproc)
 
-      # Download the toolchain (clang, GCC)
-      - name: Download toolchain
+      # Step 4: DTS to DTB Compilation
+      - name: Compile DTS to DTB
         run: |
-          mkdir -p kernel_workspace
-          cd kernel_workspace
-          # Download clang
-          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784.tar.gz -O clang.tar.gz
-          tar -xzf clang.tar.gz -C .
-          mv clang-r450784 clang-aosp
+          dtb_output_dir=arch/arm64/boot/dts/vendor/
+          mkdir -p $dtb_output_dir
+          for dts_file in $(find . -name '*.dts'); do
+            dtb_file="${dts_file%.dts}.dtb"
+            dtc -I dts -O dtb -o "$dtb_output_dir/$(basename $dtb_file)" "$dts_file"
+          done
 
-      # Set up kernel source
-      - name: Setup kernel source
+      # Step 5: Copy DTB files to the correct location
+      - name: Post-build processing
         run: |
-          cd $GITHUB_WORKSPACE/kernel_workspace
-          git clone https://github.com/YOUR_KERNEL_REPO/android-kernel.git
-          cd android-kernel
-          git checkout YOUR_BRANCH
+          dtb_destination_dir=arch/arm64/boot/dts/obiwan/
+          mkdir -p $dtb_destination_dir
+          cp arch/arm64/boot/dts/vendor/*.dtb $dtb_destination_dir
 
-      # Build the kernel
-      - name: Build kernel
-        run: |
-          cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-          export PATH=$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$PATH
-          export KBUILD_BUILD_HOST=Github-Action
-          export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
-          if [ ! -z ${{ env.KSU_EXPECTED_SIZE }} ] && [ ! -z ${{ env.KSU_EXPECTED_HASH }} ]; then
-            export KSU_EXPECTED_SIZE=${{ env.KSU_EXPECTED_SIZE }}
-            export KSU_EXPECTED_HASH=${{ env.KSU_EXPECTED_HASH }}
-          fi
-          make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }}
-          if [ ${{ env.ENABLE_CCACHE }} = true ]; then
-              make -j$(nproc --all) CC="ccache clang" O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
-          else
-              make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
-          fi
-          # Build the DTS files
-          make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} dtbs
-
-      # Check the kernel output files and copy DTBs
-      - name: Check a kernel output files
-        run: |
-         cd $GITHUB_WORKSPACE/kernel_workspace
-         if [ -f android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} ]; then
-             echo "CHECK_FILE_IS_OK=true" >> $GITHUB_ENV
-         else
-             echo "Kernel output file is empty"
-             exit 1
-         fi
-         if [ ${{ env.NEED_DTBO }} = true ]; then
-             if [ -f android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img ]; then
-                 echo "CHECK_DTBO_IS_OK=true" >> $GITHUB_ENV
-             else
-                 echo "DTBO image is empty"
-                 exit 1
-             fi
-         fi
-         # Check and copy DTB files to the correct location
-         if [ -d android-kernel/out/arch/${{ env.ARCH }}/boot/dts ]; then
-             mkdir -p kernel_workspace/AnyKernel3/dtbs/
-             cp android-kernel/out/arch/${{ env.ARCH }}/boot/dts/*.dtb kernel_workspace/AnyKernel3/dtbs/
-             echo "DTB_FILES_COPIED=true" >> $GITHUB_ENV
-         else
-             echo "DTB files directory is missing"
-             exit 1
-         fi
-
-      # Compress kernel image and DTB files (optional)
-      - name: Compress kernel image and DTBs
-        if: env.CHECK_FILE_IS_OK == 'true'
-        run: |
-          cd $GITHUB_WORKSPACE/kernel_workspace
-          tar -czf kernel_output.tar.gz android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} kernel_workspace/AnyKernel3/dtbs/
-
-      # Upload artifacts (compressed kernel image and DTBs)
-      - name: Upload kernel artifacts
+      # Step 6: Upload the artifacts
+      - name: Upload Kernel and DTBs
         uses: actions/upload-artifact@v3
         with:
-          name: kernel-build-output
-          path: $GITHUB_WORKSPACE/kernel_workspace/kernel_output.tar.gz
+          name: kernel-and-dtbs
+          path: |
+            arch/arm64/boot/Image.gz
+            arch/arm64/boot/dts/obiwan/*.dtb
