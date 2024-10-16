@@ -1,88 +1,72 @@
-name: Kernel Build
+name: Build ARM64 Kernel
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
-      - universe  # Include any other branches as needed
+      - universe
+  pull_request:
+    branches:
+      - universe
+
+env:
+  CONFIG_ENV: config.env
+  KERNEL_SOURCE: https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250
+  KERNEL_SOURCE_BRANCH: universe
+  KERNEL_CONFIG: vendor/obiwan_defconfig
+  KERNEL_IMAGE_NAME: Image
+  ARCH: arm64
 
 jobs:
-  build_kernel:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Set up environment
-        run: |
-          echo "Setting up environment variables"
-          echo "CONFIG_ENV=config.env" >> $GITHUB_ENV
-          echo "ARCH=arm64" >> $GITHUB_ENV
-          echo "KERNEL_SOURCE=https://github.com/BlissRoms-Devices/android_kernel_asus_sm8250" >> $GITHUB_ENV
-          echo "KERNEL_SOURCE_BRANCH=universe" >> $GITHUB_ENV
-          echo "KERNEL_CONFIG=vendor/obiwan_defconfig" >> $GITHUB_ENV
-          echo "KERNEL_IMAGE_NAME=Image" >> $GITHUB_ENV
-          echo "ADD_LOCALVERSION_TO_FILENAME=false" >> $GITHUB_ENV
-          echo "EXTRA_CMDS=\"LD=ld.lld\"" >> $GITHUB_ENV
-          echo "USE_CUSTOM_CLANG=true" >> $GITHUB_ENV
-          echo "CUSTOM_CLANG_SOURCE=https://github.com/BlissRoms/platform_prebuilts_clang_host_linux-x86_clang-r416183b1" >> $GITHUB_ENV
-          echo "CUSTOM_CLANG_BRANCH=universe" >> $GITHUB_ENV
-          echo "CUSTOM_CMDS=\"CLANG_TRIPLE=aarch64-linux-gnu-\"" >> $GITHUB_ENV
-          echo "CLANG_BRANCH=master-kernel-build-2021" >> $GITHUB_ENV
-          echo "CLANG_VERSION=r487747c" >> $GITHUB_ENV
-          echo "ENABLE_GCC_ARM64=true" >> $GITHUB_ENV
-          echo "ENABLE_GCC_ARM32=true" >> $GITHUB_ENV
-          echo "ENABLE_KERNELSU=false" >> $GITHUB_ENV
-          echo "REMOVE_UNUSED_PACKAGES=true" >> $GITHUB_ENV
-          echo "ENABLE_CCACHE=true" >> $GITHUB_ENV
-          echo "NEED_DTBO=false" >> $GITHUB_ENV
-          echo "BUILD_BOOT_IMG=true" >> $GITHUB_ENV
-          echo "SOURCE_BOOT_IMAGE=https://sourceforge.net/projects/payload/files/Boot/boot.img" >> $GITHUB_ENV
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git python3 device-tree-compiler
+      - name: Set Up Configuration
+        run: source $CONFIG_ENV
 
       - name: Clone Kernel Source
-        env:
-          KERNEL_SOURCE_BRANCH: ${{ env.KERNEL_SOURCE_BRANCH }}
-          KERNEL_SOURCE: ${{ env.KERNEL_SOURCE }}
-        run: |
-          git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
-          cd kernel_source
-          git submodule update --init --recursive
+        run: git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
 
-      - name: Generate Kernel Configuration
+      - name: Set Up Clang Toolchain
         run: |
-          cd kernel_source
-          make O=out $KERNEL_CONFIG  # Generates the .config file
+          if [ "$USE_CUSTOM_CLANG" = "true" ]; then
+            git clone -b $CUSTOM_CLANG_BRANCH $CUSTOM_CLANG_SOURCE clang
+            export PATH="$HOME/clang/bin:$PATH"
+            export LD=ld.lld
+            export CC=clang
+            export CXX=clang++
+            export AR=llvm-ar
+            export NM=llvm-nm
+            export OBJCOPY=llvm-objcopy
+            export OBJDUMP=llvm-objdump
+            export STRIP=llvm-strip
+            export CLANG_TRIPLE=aarch64-linux-gnu-
+          fi
 
-      - name: Build Device Tree Source (DTS)
+      - name: Kernel Build Preparation
         run: |
           cd kernel_source
-          make O=out dtbs  # Build the device tree blobs
+          export ARCH=$ARCH
+          make O=out $KERNEL_CONFIG
 
       - name: Build Kernel
         run: |
           cd kernel_source
-          make O=out -j$(nproc)  # Build the kernel image
+          make O=out ARCH=$ARCH CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-androideabi- -j$(nproc)
 
-      - name: Upload Kernel Image
-        uses: actions/upload-artifact@v3
-        with:
-          name: kernel-image
-          path: kernel_source/out/$KERNEL_IMAGE_NAME  # Update this path if necessary
-
-      - name: Upload Device Tree Blobs
-        uses: actions/upload-artifact@v3
-        with:
-          name: device-tree-blobs
-          path: kernel_source/out/arch/arm64/boot/dts/*.dtb  # Update this path if necessary
-
-      - name: Clean up
+      - name: Build Device Tree Blob (DTB) and DTS
         run: |
           cd kernel_source
-          make clean
+          make O=out dtbs
+
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Kernel-Artifacts
+          path: |
+            kernel_source/out/arch/arm64/boot/Image
+            kernel_source/out/arch/arm64/boot/dts
