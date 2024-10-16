@@ -23,10 +23,37 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set Up Configuration
         run: source $CONFIG_ENV
+
+      - name: Install Required Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi \
+            libncurses-dev \
+            bison \
+            flex \
+            bc \
+            lzop \
+            cpio \
+            libssl-dev \
+            clang \
+            git \
+            wget \
+            curl \
+            python3 \
+            zip \
+            automake \
+            autoconf \
+            pkg-config \
+            device-tree-compiler \
+            rsync \
+            dos2unix
 
       - name: Clone Kernel Source
         run: git clone -b $KERNEL_SOURCE_BRANCH $KERNEL_SOURCE kernel_source
@@ -56,7 +83,7 @@ jobs:
       - name: Build Kernel
         run: |
           cd kernel_source
-          make O=out ARCH=$ARCH CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-androideabi- -j$(nproc)
+          make O=out ARCH=$ARCH CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- -j$(nproc)
 
       - name: Build Device Tree Blob (DTB) and DTS
         run: |
