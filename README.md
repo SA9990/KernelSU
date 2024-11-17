@@ -1,5 +1,8 @@
 # KernelSU Action
-
+This is created by https://github.com/xiaoleGun
+and modifications introduced by https://github.com/bxySo
+I hold no creative authority over this.(thanks to original developer)
+pls checkout their original work.
 **KernelSU Action** is an automation tool for building non-GKI (Non-Generic Kernel Image) kernels with **KernelSU** integration for Android devices. It uses **GitHub Actions** to streamline the process of compiling, customizing, and flashing your kernel with KernelSU support. This action is intended for developers familiar with kernel building and Android.
 
 > **Warning**: If you are using someone else’s kernel, please use this action for personal use only. Do not redistribute others' work. Respect the author's intellectual property.
