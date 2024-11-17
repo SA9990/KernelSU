@@ -1,3 +1,4 @@
+This is just for learning purpose.
 # KernelSU Action
 This is created by https://github.com/xiaoleGun
 and modifications introduced by https://github.com/bxySo
