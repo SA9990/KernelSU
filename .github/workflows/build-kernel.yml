@@ -309,7 +309,14 @@ jobs:
         if [ ${{ env.CHECK_DTBO_IS_OK }} = true ]; then
             cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img AnyKernel3/
         fi
+        if [ ! -f android-kernel/out/arch/${{ env.ARCH }}/boot/dtb ]; then
+            dts_source=arch/${{ env.ARCH }}/boot/dts/vendor/qcom
+            find android-kernel/out/$dts_source -name '*.dtb' -exec cat {} + >android-kernel/out/arch/${{ env.ARCH }}/boot/dtb
+        fi
+        cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtb AnyKernel3/
+       
         rm -rf AnyKernel3/.git* AnyKernel3/README.md
+
 
     - name: Make Custom-Anykernel3
       if: env.CHECK_FILE_IS_OK == 'true' && env.USE_CUSTOM_ANYKERNEL3 == 'true'
