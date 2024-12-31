@@ -309,7 +309,7 @@ jobs:
             cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img AnyKernel3/
         fi
         if [ ! -f android-kernel/out/arch/${{ env.ARCH }}/boot/dtb ]; then
-            dts_source=arch/${{ env.ARCH }}/boot/dts/vendor/qcom
+            
             find android-kernel/out -name '*.dtb' -exec cat {} + >android-kernel/out/arch/${{ env.ARCH }}/boot/dtb
         fi
         cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtb AnyKernel3/
