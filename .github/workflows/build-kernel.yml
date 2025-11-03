@@ -250,7 +250,7 @@ jobs:
         export KBUILD_BUILD_HOST=Rog
         export KBUILD_BUILD_USER=Asus
         git submodule init
-        git submodule update
+        git submodule update --init --recursive
         make distclean
         if [ ! -z ${{ env.KSU_EXPECTED_SIZE }} ] && [ ! -z ${{ env.KSU_EXPECTED_HASH }} ]; then
           export KSU_EXPECTED_SIZE=${{ env.KSU_EXPECTED_SIZE }}
